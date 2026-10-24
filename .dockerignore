@@ -1,0 +1,9 @@
+target/
+frontend/
+.git/
+.settings/
+.classpath
+.project
+*.log
+.env
+.env.*
