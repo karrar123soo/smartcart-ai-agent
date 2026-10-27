@@ -1,6 +1,5 @@
 package com.smartcart.config;
 
-import java.net.URI;
 import javax.sql.DataSource;
 
 import org.slf4j.Logger;
@@ -29,37 +28,28 @@ public class DatabaseConfig {
 	@Value("${spring.datasource.driver-class-name:com.mysql.cj.jdbc.Driver}")
 	private String driverClassName;
 
+	public static class ConnectionInfo {
+		public final String jdbcUrl;
+		public final String username;
+		public final String password;
+
+		public ConnectionInfo(String jdbcUrl, String username, String password) {
+			this.jdbcUrl = jdbcUrl;
+			this.username = username;
+			this.password = password;
+		}
+	}
+
 	@Bean
 	@Primary
 	public DataSource dataSource() {
-		String finalUrl = sanitizeJdbcUrl(rawUrl);
-		String finalUsername = configuredUsername;
-		String finalPassword = configuredPassword;
-
-		// Extract credentials if embedded in URI (mysql://user:password@host:port/database)
-		if (rawUrl != null && rawUrl.startsWith("mysql://")) {
-			try {
-				URI uri = URI.create(rawUrl);
-				String userInfo = uri.getUserInfo();
-				if (userInfo != null && !userInfo.isEmpty()) {
-					String[] userPass = userInfo.split(":", 2);
-					if (finalUsername == null || "root".equals(finalUsername)) {
-						finalUsername = userPass[0];
-					}
-					if (userPass.length > 1 && (finalPassword == null || "root".equals(finalPassword))) {
-						finalPassword = userPass[1];
-					}
-				}
-			} catch (Exception e) {
-				log.warn("Could not parse user info from database URI: {}", e.getMessage());
-			}
-		}
+		ConnectionInfo info = parseConnectionInfo(rawUrl, configuredUsername, configuredPassword);
 
 		HikariDataSource dataSource = new HikariDataSource();
 		dataSource.setDriverClassName(driverClassName);
-		dataSource.setJdbcUrl(finalUrl);
-		dataSource.setUsername(finalUsername);
-		dataSource.setPassword(finalPassword);
+		dataSource.setJdbcUrl(info.jdbcUrl);
+		dataSource.setUsername(info.username);
+		dataSource.setPassword(info.password);
 
 		// Optimized pool settings for free-tier cloud deployment
 		dataSource.setMaximumPoolSize(5);
@@ -71,39 +61,50 @@ public class DatabaseConfig {
 		return dataSource;
 	}
 
-	public static String sanitizeJdbcUrl(String rawUrl) {
+	public static ConnectionInfo parseConnectionInfo(String rawUrl, String defaultUser, String defaultPass) {
 		if (rawUrl == null || rawUrl.isBlank()) {
-			return rawUrl;
+			return new ConnectionInfo(rawUrl, defaultUser, defaultPass);
 		}
 
 		String trimmed = rawUrl.trim();
+		String username = defaultUser;
+		String password = defaultPass;
 
-		// Handle cloud URIs starting with mysql://
-		if (trimmed.startsWith("mysql://")) {
+		// Check environment variables first
+		String envUser = getFirstNonBlankEnv("SPRING_DATASOURCE_USERNAME", "DB_USERNAME", "DATABASE_USERNAME", "MYSQLUSER");
+		String envPass = getFirstNonBlankEnv("SPRING_DATASOURCE_PASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD", "MYSQLPASSWORD");
+
+		if (envUser != null && !envUser.isBlank()) {
+			username = envUser;
+		}
+		if (envPass != null && !envPass.isBlank()) {
+			password = envPass;
+		}
+
+		// Normalize: check if credentials are embedded (user:password@)
+		String withoutJdbc = trimmed.startsWith("jdbc:") ? trimmed.substring(5) : trimmed;
+
+		if (withoutJdbc.contains("@")) {
 			try {
-				URI uri = URI.create(trimmed);
-				String host = uri.getHost();
-				int port = uri.getPort() == -1 ? 4000 : uri.getPort();
-				String path = uri.getPath() != null && !uri.getPath().isEmpty() ? uri.getPath() : "/test";
-				String query = uri.getQuery();
+				int schemeIdx = withoutJdbc.indexOf("://");
+				String remainder = schemeIdx != -1 ? withoutJdbc.substring(schemeIdx + 3) : withoutJdbc;
 
-				StringBuilder jdbcUrl = new StringBuilder("jdbc:mysql://")
-						.append(host)
-						.append(":")
-						.append(port)
-						.append(path);
+				int atIdx = remainder.lastIndexOf("@");
+				String userInfo = remainder.substring(0, atIdx);
+				String hostPortDb = remainder.substring(atIdx + 1);
 
-				if (query != null && !query.isEmpty()) {
-					jdbcUrl.append("?").append(query);
-					if (!query.contains("sslMode") && !query.contains("useSSL")) {
-						jdbcUrl.append("&sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3");
-					}
-				} else {
-					jdbcUrl.append("?sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3");
+				String[] userPass = userInfo.split(":", 2);
+				if (username == null || "root".equals(username)) {
+					username = userPass[0];
 				}
-				return jdbcUrl.toString();
+				if (userPass.length > 1 && (password == null || "root".equals(password))) {
+					password = userPass[1];
+				}
+
+				// Rebuild clean URL without user:password@
+				trimmed = "jdbc:mysql://" + hostPortDb;
 			} catch (Exception e) {
-				trimmed = "jdbc:" + trimmed;
+				log.warn("Could not parse embedded credentials from URL: {}", e.getMessage());
 			}
 		}
 
@@ -112,11 +113,25 @@ public class DatabaseConfig {
 			trimmed = "jdbc:" + trimmed;
 		}
 
-		// If connecting to TiDB Cloud, guarantee SSL flags are appended
+		// Ensure TiDB Cloud SSL parameters
 		if (trimmed.contains("tidbcloud.com") && !trimmed.contains("sslMode") && !trimmed.contains("useSSL")) {
 			trimmed = trimmed + (trimmed.contains("?") ? "&" : "?") + "sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3";
 		}
 
-		return trimmed;
+		return new ConnectionInfo(trimmed, username, password);
+	}
+
+	private static String getFirstNonBlankEnv(String... names) {
+		for (String name : names) {
+			String val = System.getenv(name);
+			if (val != null && !val.isBlank()) {
+				return val;
+			}
+		}
+		return null;
+	}
+
+	public static String sanitizeJdbcUrl(String rawUrl) {
+		return parseConnectionInfo(rawUrl, "root", "root").jdbcUrl;
 	}
 }

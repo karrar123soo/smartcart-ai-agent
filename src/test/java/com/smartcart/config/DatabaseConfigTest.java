@@ -8,38 +8,57 @@ import org.junit.jupiter.api.Test;
 class DatabaseConfigTest {
 
 	@Test
-	void sanitizeJdbcUrl_shouldConvertRawMysqlUriToJdbc() {
+	void parseConnectionInfo_shouldExtractCredentialsFromMysqlUri() {
 		String raw = "mysql://aTeXxfqU7Q8ZvKJ.root:secret123@gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test";
-		String result = DatabaseConfig.sanitizeJdbcUrl(raw);
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
 
 		assertEquals(
 				"jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test?sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3",
-				result
+				info.jdbcUrl
 		);
+		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
+		assertEquals("secret123", info.password);
 	}
 
 	@Test
-	void sanitizeJdbcUrl_shouldPreserveExistingQueryParameters() {
+	void parseConnectionInfo_shouldExtractCredentialsFromJdbcMysqlUri() {
+		String raw = "jdbc:mysql://aTeXxfqU7Q8ZvKJ.root:secret123@gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test";
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
+
+		assertEquals(
+				"jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test?sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3",
+				info.jdbcUrl
+		);
+		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
+		assertEquals("secret123", info.password);
+	}
+
+	@Test
+	void parseConnectionInfo_shouldPreserveExistingQueryParameters() {
 		String raw = "mysql://user:pass@host:4000/test?sslMode=REQUIRED";
-		String result = DatabaseConfig.sanitizeJdbcUrl(raw);
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
 
-		assertEquals("jdbc:mysql://host:4000/test?sslMode=REQUIRED", result);
+		assertEquals("jdbc:mysql://host:4000/test?sslMode=REQUIRED", info.jdbcUrl);
+		assertEquals("user", info.username);
+		assertEquals("pass", info.password);
 	}
 
 	@Test
-	void sanitizeJdbcUrl_shouldLeaveProperJdbcUrlUntouched() {
+	void parseConnectionInfo_shouldLeaveProperJdbcUrlUntouched() {
 		String jdbcUrl = "jdbc:mysql://localhost:3306/smartcart_db";
-		String result = DatabaseConfig.sanitizeJdbcUrl(jdbcUrl);
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(jdbcUrl, "root", "root");
 
-		assertEquals(jdbcUrl, result);
+		assertEquals(jdbcUrl, info.jdbcUrl);
+		assertEquals("root", info.username);
+		assertEquals("root", info.password);
 	}
 
 	@Test
-	void sanitizeJdbcUrl_shouldAddSslToTidbUrlIfMissing() {
+	void parseConnectionInfo_shouldAddSslToTidbUrlIfMissing() {
 		String raw = "jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test";
-		String result = DatabaseConfig.sanitizeJdbcUrl(raw);
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
 
-		assertTrue(result.contains("sslMode=VERIFY_IDENTITY"));
-		assertTrue(result.startsWith("jdbc:mysql://"));
+		assertTrue(info.jdbcUrl.contains("sslMode=VERIFY_IDENTITY"));
+		assertTrue(info.jdbcUrl.startsWith("jdbc:mysql://"));
 	}
 }
