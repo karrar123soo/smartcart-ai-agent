@@ -1,5 +1,7 @@
 package com.smartcart.config;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import javax.sql.DataSource;
 
 import org.slf4j.Logger;
@@ -32,11 +34,15 @@ public class DatabaseConfig {
 		public final String jdbcUrl;
 		public final String username;
 		public final String password;
+		public final String usernameSource;
+		public final String passwordSource;
 
-		public ConnectionInfo(String jdbcUrl, String username, String password) {
+		public ConnectionInfo(String jdbcUrl, String username, String password, String usernameSource, String passwordSource) {
 			this.jdbcUrl = jdbcUrl;
 			this.username = username;
 			this.password = password;
+			this.usernameSource = usernameSource;
+			this.passwordSource = passwordSource;
 		}
 	}
 
@@ -44,6 +50,9 @@ public class DatabaseConfig {
 	@Primary
 	public DataSource dataSource() {
 		ConnectionInfo info = parseConnectionInfo(rawUrl, configuredUsername, configuredPassword);
+
+		// Safe Diagnostics (Never prints passwords or secrets)
+		logSafeDiagnostics(info);
 
 		HikariDataSource dataSource = new HikariDataSource();
 		dataSource.setDriverClassName(driverClassName);
@@ -61,27 +70,61 @@ public class DatabaseConfig {
 		return dataSource;
 	}
 
+	private void logSafeDiagnostics(ConnectionInfo info) {
+		boolean isCloud = info.jdbcUrl != null && info.jdbcUrl.contains("tidbcloud.com");
+		log.info("============================================================");
+		log.info("SMARTCART DATABASE CONNECTION DIAGNOSTICS (SAFE MODE)");
+		log.info("Target JDBC URL      : {}", maskUrlForLogs(info.jdbcUrl));
+		log.info("Target DB Username   : {} (source: {})", info.username, info.usernameSource);
+		log.info("Password Configured  : {} (length: {} chars, source: {})",
+				(info.password != null && !info.password.isBlank()),
+				(info.password != null ? info.password.length() : 0),
+				info.passwordSource);
+
+		if (isCloud) {
+			if ("root".equalsIgnoreCase(info.username)) {
+				log.error("DIAGNOSTIC ALERT: Username is 'root'! TiDB Cloud requires a cluster user like '<prefix>.root'.");
+			}
+			if ("root".equals(info.password)) {
+				log.error("DIAGNOSTIC ALERT: Password is still the local default 'root'! Cloud password was not provided.");
+			}
+			if (info.password != null && info.password.contains("<PASSWORD>")) {
+				log.error("DIAGNOSTIC ALERT: Password contains the literal placeholder '<PASSWORD>'.");
+			}
+		}
+		log.info("============================================================");
+	}
+
+	private static String maskUrlForLogs(String url) {
+		if (url == null) return "null";
+		return url.replaceAll("://[^@]+@", "://***:***@");
+	}
+
 	public static ConnectionInfo parseConnectionInfo(String rawUrl, String defaultUser, String defaultPass) {
 		if (rawUrl == null || rawUrl.isBlank()) {
-			return new ConnectionInfo(rawUrl, defaultUser, defaultPass);
+			return new ConnectionInfo(rawUrl, defaultUser, defaultPass, "DEFAULT", "DEFAULT");
 		}
 
 		String trimmed = rawUrl.trim();
 		String username = defaultUser;
 		String password = defaultPass;
+		String userSource = ("root".equals(defaultUser)) ? "DEFAULT_LOCAL" : "APPLICATION_PROPERTIES";
+		String passSource = ("root".equals(defaultPass)) ? "DEFAULT_LOCAL" : "APPLICATION_PROPERTIES";
 
-		// Check environment variables first
+		// 1. Check explicit environment variables (Highest priority)
 		String envUser = getFirstNonBlankEnv("SPRING_DATASOURCE_USERNAME", "DB_USERNAME", "DATABASE_USERNAME", "MYSQLUSER");
 		String envPass = getFirstNonBlankEnv("SPRING_DATASOURCE_PASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD", "MYSQLPASSWORD");
 
-		if (envUser != null && !envUser.isBlank()) {
+		if (envUser != null && !envUser.isBlank() && !"root".equals(envUser)) {
 			username = envUser;
+			userSource = "ENVIRONMENT_VARIABLE";
 		}
-		if (envPass != null && !envPass.isBlank()) {
+		if (envPass != null && !envPass.isBlank() && !"root".equals(envPass)) {
 			password = envPass;
+			passSource = "ENVIRONMENT_VARIABLE";
 		}
 
-		// Normalize: check if credentials are embedded (user:password@)
+		// 2. Check if credentials are embedded in URL (user:password@)
 		String withoutJdbc = trimmed.startsWith("jdbc:") ? trimmed.substring(5) : trimmed;
 
 		if (withoutJdbc.contains("@")) {
@@ -94,11 +137,24 @@ public class DatabaseConfig {
 				String hostPortDb = remainder.substring(atIdx + 1);
 
 				String[] userPass = userInfo.split(":", 2);
-				if (username == null || "root".equals(username)) {
-					username = userPass[0];
+				if (userPass.length > 0 && !userPass[0].isBlank()) {
+					String extractedUser = decodeIfPercentEncoded(userPass[0]);
+					if (username == null || "root".equals(username) || "DEFAULT_LOCAL".equals(userSource)) {
+						username = extractedUser;
+						userSource = "EMBEDDED_IN_URL";
+					}
 				}
-				if (userPass.length > 1 && (password == null || "root".equals(password))) {
-					password = userPass[1];
+
+				if (userPass.length > 1 && !userPass[1].isBlank()) {
+					String extractedPass = decodeIfPercentEncoded(userPass[1]);
+					boolean isPlaceholder = extractedPass.equalsIgnoreCase("<PASSWORD>")
+							|| extractedPass.equalsIgnoreCase("<your_password>")
+							|| extractedPass.equalsIgnoreCase("<your-password>");
+
+					if (!isPlaceholder && (password == null || "root".equals(password) || "DEFAULT_LOCAL".equals(passSource))) {
+						password = extractedPass;
+						passSource = "EMBEDDED_IN_URL";
+					}
 				}
 
 				// Rebuild clean URL without user:password@
@@ -108,17 +164,28 @@ public class DatabaseConfig {
 			}
 		}
 
-		// Ensure jdbc: prefix
+		// 3. Ensure jdbc: prefix
 		if (!trimmed.startsWith("jdbc:")) {
 			trimmed = "jdbc:" + trimmed;
 		}
 
-		// Ensure TiDB Cloud SSL parameters
+		// 4. Ensure TiDB Cloud SSL parameters
 		if (trimmed.contains("tidbcloud.com") && !trimmed.contains("sslMode") && !trimmed.contains("useSSL")) {
 			trimmed = trimmed + (trimmed.contains("?") ? "&" : "?") + "sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3";
 		}
 
-		return new ConnectionInfo(trimmed, username, password);
+		return new ConnectionInfo(trimmed, username, password, userSource, passSource);
+	}
+
+	private static String decodeIfPercentEncoded(String str) {
+		if (str == null) return null;
+		try {
+			if (str.contains("%")) {
+				return URLDecoder.decode(str, StandardCharsets.UTF_8);
+			}
+		} catch (Exception ignored) {
+		}
+		return str;
 	}
 
 	private static String getFirstNonBlankEnv(String... names) {

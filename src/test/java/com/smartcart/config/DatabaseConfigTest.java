@@ -18,6 +18,8 @@ class DatabaseConfigTest {
 		);
 		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
 		assertEquals("secret123", info.password);
+		assertEquals("EMBEDDED_IN_URL", info.usernameSource);
+		assertEquals("EMBEDDED_IN_URL", info.passwordSource);
 	}
 
 	@Test
@@ -31,6 +33,24 @@ class DatabaseConfigTest {
 		);
 		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
 		assertEquals("secret123", info.password);
+	}
+
+	@Test
+	void parseConnectionInfo_shouldIgnorePlaceholderPasswordInUrlWhenDefaultPassPresent() {
+		String raw = "mysql://aTeXxfqU7Q8ZvKJ.root:<PASSWORD>@gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test";
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "myRealPass");
+
+		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
+		assertEquals("myRealPass", info.password);
+		assertEquals("APPLICATION_PROPERTIES", info.passwordSource);
+	}
+
+	@Test
+	void parseConnectionInfo_shouldDecodeUrlEncodedPassword() {
+		String raw = "mysql://aTeXxfqU7Q8ZvKJ.root:my%23secret%40pass@gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test";
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
+
+		assertEquals("my#secret@pass", info.password);
 	}
 
 	@Test
@@ -51,6 +71,8 @@ class DatabaseConfigTest {
 		assertEquals(jdbcUrl, info.jdbcUrl);
 		assertEquals("root", info.username);
 		assertEquals("root", info.password);
+		assertEquals("DEFAULT_LOCAL", info.usernameSource);
+		assertEquals("DEFAULT_LOCAL", info.passwordSource);
 	}
 
 	@Test
