@@ -54,6 +54,22 @@ class DatabaseConfigTest {
 	}
 
 	@Test
+	void parseConnectionInfo_shouldCleanSurroundingQuotesAndWhitespace() {
+		String raw = "mysql://\"aTeXxfqU7Q8ZvKJ.root\":\"myPass \"@gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test";
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
+
+		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
+		assertEquals("myPass", info.password);
+	}
+
+	@Test
+	void cleanValue_shouldStripQuotesAndTrim() {
+		assertEquals("cleanPass", DatabaseConfig.cleanValue("  \"cleanPass\"  "));
+		assertEquals("cleanPass", DatabaseConfig.cleanValue(" 'cleanPass' "));
+		assertEquals("cleanPass", DatabaseConfig.cleanValue("cleanPass"));
+	}
+
+	@Test
 	void parseConnectionInfo_shouldPreserveExistingQueryParameters() {
 		String raw = "mysql://user:pass@host:4000/test?sslMode=REQUIRED";
 		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");

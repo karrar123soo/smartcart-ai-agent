@@ -72,27 +72,34 @@ public class DatabaseConfig {
 
 	private void logSafeDiagnostics(ConnectionInfo info) {
 		boolean isCloud = info.jdbcUrl != null && info.jdbcUrl.contains("tidbcloud.com");
-		log.info("============================================================");
-		log.info("SMARTCART DATABASE CONNECTION DIAGNOSTICS (SAFE MODE)");
-		log.info("Target JDBC URL      : {}", maskUrlForLogs(info.jdbcUrl));
-		log.info("Target DB Username   : {} (source: {})", info.username, info.usernameSource);
-		log.info("Password Configured  : {} (length: {} chars, source: {})",
-				(info.password != null && !info.password.isBlank()),
-				(info.password != null ? info.password.length() : 0),
-				info.passwordSource);
+		String msg = "\n============================================================\n" +
+				"SMARTCART DATABASE CONNECTION DIAGNOSTICS (SAFE MODE)\n" +
+				"Target JDBC URL      : " + maskUrlForLogs(info.jdbcUrl) + "\n" +
+				"Target DB Username   : " + info.username + " (source: " + info.usernameSource + ")\n" +
+				"Password Configured  : " + (info.password != null && !info.password.isBlank()) +
+				" (length: " + (info.password != null ? info.password.length() : 0) + " chars, source: " + info.passwordSource + ")\n" +
+				"============================================================";
+
+		System.out.println(msg);
+		log.info(msg);
 
 		if (isCloud) {
 			if ("root".equalsIgnoreCase(info.username)) {
-				log.error("DIAGNOSTIC ALERT: Username is 'root'! TiDB Cloud requires a cluster user like '<prefix>.root'.");
+				String alert = "DIAGNOSTIC ALERT: Username is 'root'! TiDB Cloud requires a cluster user like '<prefix>.root'.";
+				System.err.println(alert);
+				log.error(alert);
 			}
 			if ("root".equals(info.password)) {
-				log.error("DIAGNOSTIC ALERT: Password is still the local default 'root'! Cloud password was not provided.");
+				String alert = "DIAGNOSTIC ALERT: Password is still the local default 'root'! Cloud password was not provided.";
+				System.err.println(alert);
+				log.error(alert);
 			}
 			if (info.password != null && info.password.contains("<PASSWORD>")) {
-				log.error("DIAGNOSTIC ALERT: Password contains the literal placeholder '<PASSWORD>'.");
+				String alert = "DIAGNOSTIC ALERT: Password contains the literal placeholder '<PASSWORD>'.";
+				System.err.println(alert);
+				log.error(alert);
 			}
 		}
-		log.info("============================================================");
 	}
 
 	private static String maskUrlForLogs(String url) {
@@ -102,18 +109,18 @@ public class DatabaseConfig {
 
 	public static ConnectionInfo parseConnectionInfo(String rawUrl, String defaultUser, String defaultPass) {
 		if (rawUrl == null || rawUrl.isBlank()) {
-			return new ConnectionInfo(rawUrl, defaultUser, defaultPass, "DEFAULT", "DEFAULT");
+			return new ConnectionInfo(rawUrl, cleanValue(defaultUser), cleanValue(defaultPass), "DEFAULT", "DEFAULT");
 		}
 
 		String trimmed = rawUrl.trim();
-		String username = defaultUser;
-		String password = defaultPass;
-		String userSource = ("root".equals(defaultUser)) ? "DEFAULT_LOCAL" : "APPLICATION_PROPERTIES";
-		String passSource = ("root".equals(defaultPass)) ? "DEFAULT_LOCAL" : "APPLICATION_PROPERTIES";
+		String username = cleanValue(defaultUser);
+		String password = cleanValue(defaultPass);
+		String userSource = ("root".equals(username)) ? "DEFAULT_LOCAL" : "APPLICATION_PROPERTIES";
+		String passSource = ("root".equals(password)) ? "DEFAULT_LOCAL" : "APPLICATION_PROPERTIES";
 
 		// 1. Check explicit environment variables (Highest priority)
-		String envUser = getFirstNonBlankEnv("SPRING_DATASOURCE_USERNAME", "DB_USERNAME", "DATABASE_USERNAME", "MYSQLUSER");
-		String envPass = getFirstNonBlankEnv("SPRING_DATASOURCE_PASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD", "MYSQLPASSWORD");
+		String envUser = cleanValue(getFirstNonBlankEnv("SPRING_DATASOURCE_USERNAME", "DB_USERNAME", "DATABASE_USERNAME", "MYSQLUSER"));
+		String envPass = cleanValue(getFirstNonBlankEnv("SPRING_DATASOURCE_PASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD", "MYSQLPASSWORD"));
 
 		if (envUser != null && !envUser.isBlank() && !"root".equals(envUser)) {
 			username = envUser;
@@ -138,7 +145,7 @@ public class DatabaseConfig {
 
 				String[] userPass = userInfo.split(":", 2);
 				if (userPass.length > 0 && !userPass[0].isBlank()) {
-					String extractedUser = decodeIfPercentEncoded(userPass[0]);
+					String extractedUser = cleanValue(decodeIfPercentEncoded(userPass[0]));
 					if (username == null || "root".equals(username) || "DEFAULT_LOCAL".equals(userSource)) {
 						username = extractedUser;
 						userSource = "EMBEDDED_IN_URL";
@@ -146,7 +153,7 @@ public class DatabaseConfig {
 				}
 
 				if (userPass.length > 1 && !userPass[1].isBlank()) {
-					String extractedPass = decodeIfPercentEncoded(userPass[1]);
+					String extractedPass = cleanValue(decodeIfPercentEncoded(userPass[1]));
 					boolean isPlaceholder = extractedPass.equalsIgnoreCase("<PASSWORD>")
 							|| extractedPass.equalsIgnoreCase("<your_password>")
 							|| extractedPass.equalsIgnoreCase("<your-password>");
@@ -175,6 +182,19 @@ public class DatabaseConfig {
 		}
 
 		return new ConnectionInfo(trimmed, username, password, userSource, passSource);
+	}
+
+	public static String cleanValue(String val) {
+		if (val == null) {
+			return null;
+		}
+		String trimmed = val.trim();
+		// Strip surrounding single or double quotes if accidentally included in dashboard
+		if ((trimmed.startsWith("\"") && trimmed.endsWith("\"") && trimmed.length() >= 2) ||
+				(trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length() >= 2)) {
+			trimmed = trimmed.substring(1, trimmed.length() - 1).trim();
+		}
+		return trimmed;
 	}
 
 	private static String decodeIfPercentEncoded(String str) {
