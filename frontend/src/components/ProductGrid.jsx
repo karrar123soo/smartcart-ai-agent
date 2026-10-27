@@ -114,8 +114,8 @@ export default function ProductGrid({
         <div className="catalog-error-box">
           <AlertTriangle size={24} className="error-icon" />
           <div className="error-text">
-            <strong>Unable to connect to MySQL backend at http://localhost:8081</strong>
-            <p>Ensure your Spring Boot backend application is running on port 8081.</p>
+            <strong>Unable to connect to SmartCart backend</strong>
+            <p>{error || 'Ensure the backend service is running and accessible.'}</p>
           </div>
           <button type="button" className="btn-retry" onClick={onRefresh}>
             Retry Now
