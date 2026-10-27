@@ -1,9 +1,10 @@
 /**
  * SmartCart AI API Client
- * Configured to communicate with the Spring Boot backend at http://localhost:8081
+ * Configured to communicate with the Spring Boot backend
+ * (Default: https://smartcart-ai-agent.onrender.com, overridden by VITE_API_BASE_URL in local dev or Vercel)
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://smartcart-ai-agent.onrender.com').replace(/\/+$/, '');
 
 /**
  * Fetch all products from the catalog

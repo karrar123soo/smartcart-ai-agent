@@ -183,7 +183,7 @@ export default function AIChatPanel({ isOpen, onClose, externalPrompt }) {
     } catch (err) {
       console.error('Chat error:', err);
       setErrorMsg(
-        err.message || 'Unable to communicate with the Spring Boot AI backend. Check if it is running on port 8081.'
+        err.message || 'Unable to communicate with the SmartCart AI backend. Please verify your internet connection or try again.'
       );
     } finally {
       setIsLoading(false);
