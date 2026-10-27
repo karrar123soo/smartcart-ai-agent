@@ -1,49 +1,160 @@
 # SmartCart AI — Autonomous AI Shopping Agent
 
-A full-stack, enterprise-grade e-commerce application powered by **Java 17**, **Spring Boot 4.1.1**, **Spring AI 2.0.1**, **Google Gemini**, and a modern **React 19 + Vite** frontend.
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-black?style=for-the-badge&logo=vercel)](https://frontend-six-bay-21.vercel.app)
+[![Backend API](https://img.shields.io/badge/Backend_API-Render-46E3B7?style=for-the-badge&logo=render)](https://smartcart-ai-agent.onrender.com/api/products)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Spring AI](https://img.shields.io/badge/Spring_AI-2.0.1-6DB33F?style=for-the-badge&logo=spring&logoColor=white)](https://spring.io/projects/spring-ai)
+[![Google Gemini](https://img.shields.io/badge/Google_Gemini-3.5_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 
-The AI assistant connects directly to a live **MySQL database** via Spring AI `@Tool` calling to answer product inquiries, check exact verified prices, and offer budget-friendly recommendations without hallucinations.
+A full-stack e-commerce web application powered by **Java 17**, **Spring Boot 4.1.1**, **Spring AI 2.0.1**, **Google Gemini 3.5 Flash**, and a modern **React 19 + Vite** frontend.
 
----
-
-## Architecture Overview
-
-- **Backend:** Spring Boot 4.1.1, Java 17
-- **AI Framework:** Spring AI 2.0.1 (`spring-ai-starter-model-google-genai`)
-- **LLM:** Google Gemini 3.5 Flash
-- **AI Tools:** `ProductTools` (`searchProducts`, `getProductsByMaxPrice`)
-- **Database:** MySQL 8.0 (`smartcart_db`)
-- **Frontend:** React 19, Vite, Lucide Icons, Modern CSS Design System
-- **Ports:**
-  - Backend API: `http://localhost:8081`
-  - Frontend Web UI: `http://localhost:5173`
+The AI assistant connects directly to a live **MySQL / TiDB Cloud** relational database via Spring AI `@Tool` calling to answer product inquiries, check exact verified prices, and offer budget-friendly recommendations without hallucinations.
 
 ---
 
-## Prerequisites
+## 🌐 Live Demo & Endpoints
 
-1. **Java 17+** (JDK 17 installed and configured on `PATH`)
-2. **Node.js 20+** and **npm**
-3. **MySQL 8.0+** running locally on port 3306 with database `smartcart_db`
-4. **Environment Variables**:
-   Configure your Gemini API key and MySQL password:
-   ```bash
-   # Windows PowerShell
-   $env:GEMINI_API_KEY="your-api-key-here"
-   $env:DB_PASSWORD="your-mysql-password"
-
-   # Linux/macOS
-   export GEMINI_API_KEY="your-api-key-here"
-   export DB_PASSWORD="your-mysql-password"
-   ```
+| Service | Platform | URL |
+| :--- | :--- | :--- |
+| **Frontend Web App** | **Vercel** | [https://frontend-six-bay-21.vercel.app](https://frontend-six-bay-21.vercel.app) |
+| **Catalog API** | **Render** | [https://smartcart-ai-agent.onrender.com/api/products](https://smartcart-ai-agent.onrender.com/api/products) |
+| **AI Chat Agent API** | **Render** | `POST https://smartcart-ai-agent.onrender.com/api/ai/chat` |
+| **GitHub Repository** | **GitHub** | [https://github.com/karrar123soo/smartcart-ai-agent](https://github.com/karrar123soo/smartcart-ai-agent) |
 
 ---
 
-## 1. Running the Spring Boot Backend
+## ✨ Key Features
 
-From the project root (`smartcart-ai-agent`):
+1. **Autonomous AI Shopping Assistant**:
+   * Slide-over conversational assistant powered by **Google Gemini 3.5 Flash**.
+   * Integrates Spring AI function calling via `@Tool` (`searchProducts`, `getProductsByMaxPrice`).
+   * **Zero Hallucination Guarantee**: Constrained strictly to verified database inventory and real-time prices.
 
-### Option A: Using Maven Wrapper (Terminal)
+2. **Live Store Catalog**:
+   * Real-time product feed rendered directly from the relational database (`/api/products`).
+   * Instant search by keyword matching across product name, category, and description.
+   * Dynamic category filtering (Electronics, Footwear, Home & Kitchen, etc.) and price/name sorting.
+
+3. **Dynamic Product Management**:
+   * Interactive modal to insert new products directly into MySQL / TiDB Cloud.
+   * New items are immediately queryable by the AI shopping assistant with zero restart required.
+
+4. **Interactive Shopping Cart**:
+   * Slide-out cart drawer with quantity adjustments, item removals, subtotal calculation, and checkout simulation.
+   * Persisted locally in `localStorage` for a smooth user experience.
+
+5. **Cloud-Native & Production Ready**:
+   * **Backend**: Dockerized Spring Boot service hosted on **Render**.
+   * **Frontend**: Optimized Single Page Application (SPA) hosted on **Vercel** with automatic rewrite routing.
+   * **Database**: **TiDB Cloud Serverless** MySQL-compatible distributed SQL database with automated SSL/TLS encryption.
+   * **Idempotent Seeder**: Automatically initializes default catalog items on first boot without duplicating records.
+
+---
+
+## 🛠️ Technology Stack
+
+### Backend
+* **Language & Runtime:** Java 17
+* **Framework:** Spring Boot 4.1.1
+* **AI Engine:** Spring AI 2.0.1 (`spring-ai-starter-model-google-genai`)
+* **LLM Provider:** Google Gemini (`gemini-3.5-flash`)
+* **Persistence & ORM:** Spring Data JPA, Hibernate ORM 7.x, HikariCP Connection Pool
+* **Database Driver:** MySQL Connector/J 8.x / 9.x
+* **Build Tool:** Apache Maven with Maven Wrapper (`mvnw`)
+
+### Frontend
+* **Library:** React 19
+* **Tooling & Bundler:** Vite 8
+* **Styling:** Vanilla CSS with custom modern design system (Glassmorphism, CSS variables, responsive grid)
+* **Icons:** Lucide React
+
+### Cloud Infrastructure
+* **Frontend Hosting:** Vercel (Edge Network)
+* **Backend Hosting:** Render (Web Service)
+* **Database:** TiDB Cloud Serverless (MySQL Protocol, Port 4000, TLSv1.2/TLSv1.3)
+
+---
+
+## 🏗️ Architecture & AI Tool Calling
+
+```
+┌─────────────────────────────────┐
+│     React 19 + Vite Frontend    │
+│  (https://*.vercel.app)         │
+└────────────────┬────────────────┘
+                 │
+                 │ HTTPS / REST (CORS enabled)
+                 ▼
+┌────────────────────────────────────────────────────────┐
+│             Spring Boot Backend (Render)               │
+│                                                        │
+│  ┌───────────────────────┐   ┌──────────────────────┐  │
+│  │   ProductController   │   │   AIChatController   │  │
+│  └───────────┬───────────┘   └──────────┬───────────┘  │
+│              │                          │              │
+│              │               ┌──────────▼───────────┐  │
+│              │               │    AIChatService     │  │
+│              │               │  (Spring AI 2.0.1)   │  │
+│              │               └──────────┬───────────┘  │
+│              │                          │              │
+│              │               Function   │ Gemini Tool  │
+│              │               Calling    ▼ Execution    │
+│              │               ┌──────────────────────┐  │
+│              │               │     ProductTools     │  │
+│              │               │   (@Tool callbacks)  │  │
+│              │               └──────────┬───────────┘  │
+│              ▼                          ▼              │
+│        ┌──────────────────────────────────────┐        │
+│        │            ProductService            │        │
+│        └──────────────────┬───────────────────┘        │
+│                           │                            │
+│        ┌──────────────────▼───────────────────┐        │
+│        │          ProductRepository           │        │
+│        └──────────────────┬───────────────────┘        │
+└───────────────────────────┼────────────────────────────┘
+                            │
+                            │ HikariCP / TLS Handshake
+                            ▼
+           ┌─────────────────────────────────┐
+           │     MySQL 8.0 / TiDB Cloud      │
+           │     `product` schema table      │
+           └─────────────────────────────────┘
+```
+
+---
+
+## 🚀 Local Development Setup
+
+### 1. Prerequisites
+* **Java 17+** (`java -version`)
+* **Node.js 20+** and **npm** (`node -v`, `npm -v`)
+* **MySQL 8.0+** running locally on port 3306 (or a TiDB Cloud connection)
+* **Google Gemini API Key** ([Get a key from Google AI Studio](https://aistudio.google.com/))
+
+### 2. Database Setup (Local MySQL)
+Start your local MySQL service and create the database:
+```sql
+CREATE DATABASE smartcart_db;
+```
+
+### 3. Backend Configuration
+Create an environment file or export required variables:
+```bash
+# Windows PowerShell
+$env:GEMINI_API_KEY="your_gemini_api_key_here"
+$env:SPRING_DATASOURCE_URL="jdbc:mysql://localhost:3306/smartcart_db"
+$env:SPRING_DATASOURCE_USERNAME="root"
+$env:SPRING_DATASOURCE_PASSWORD="your_mysql_password"
+
+# Linux / macOS
+export GEMINI_API_KEY="your_gemini_api_key_here"
+export SPRING_DATASOURCE_URL="jdbc:mysql://localhost:3306/smartcart_db"
+export SPRING_DATASOURCE_USERNAME="root"
+export SPRING_DATASOURCE_PASSWORD="your_mysql_password"
+```
+
+Run the backend via Maven Wrapper:
 ```bash
 # Windows
 .\mvnw.cmd spring-boot:run
@@ -51,58 +162,71 @@ From the project root (`smartcart-ai-agent`):
 # Linux / macOS
 ./mvnw spring-boot:run
 ```
+The backend starts on **`http://localhost:8081`**.
 
-### Option B: Build and Run JAR
+Run automated tests:
 ```bash
-.\mvnw.cmd clean package -DskipTests
-java -jar target/smartcart-ai-agent-0.0.1-SNAPSHOT.jar
+.\mvnw.cmd test
 ```
 
-The backend server will start on **`http://localhost:8081`**.
-
-### Verify Backend Endpoints
-- **Product Catalog:** `GET http://localhost:8081/api/products`
-- **Add Product:** `POST http://localhost:8081/api/products`
-- **AI Chat Agent:** `POST http://localhost:8081/api/ai/chat` with body:
-  ```json
-  {
-    "message": "Do you have wireless earbuds? Tell me their exact price from the database."
-  }
-  ```
-
----
-
-## 2. Running the React Frontend
-
-Open a new terminal window and navigate to the `frontend` folder:
-
+### 4. Frontend Configuration
+Navigate to the `frontend` folder:
 ```bash
 cd frontend
 ```
 
-### Install Dependencies
+Install dependencies:
 ```bash
-npm install --legacy-peer-deps
+npm install
 ```
 
-### Start Development Server
+Start the Vite development server:
 ```bash
 npm run dev
 ```
-
-Open your browser at **`http://localhost:5173`**.
-
-### Build for Production
-```bash
-npm run build
-```
+Open **`http://localhost:5173`** in your browser.
 
 ---
 
-## Key Features
+## 📡 API Endpoints Reference
 
-1. **Live Catalog Sync:** Products are loaded directly from MySQL (`/api/products`) with real-time filtering, search, and sorting.
-2. **Interactive AI Shopping Assistant:** Slide-over assistant drawer with Google Gemini tool execution (`searchProducts` & `getProductsByMaxPrice`).
-3. **Add Product Modal:** Add new items directly to MySQL and immediately query the AI about them to see real-time database discovery.
-4. **Shopping Cart Drawer:** Add items to cart, adjust quantities, calculate totals, and simulate checkout.
-5. **Zero Hallucination Guardrails:** System prompts restrict the model from inventing inventory or fabricating prices.
+### 1. Catalog Endpoints
+* **`GET /api/products`**: Fetch all available catalog items.
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Wireless Earbuds",
+      "category": "Electronics",
+      "price": 1499.0,
+      "description": "Bluetooth Wireless earbuds"
+    }
+  ]
+  ```
+* **`POST /api/products`**: Add a new item to the store catalog.
+  ```json
+  {
+    "name": "Portable Bluetooth Speaker",
+    "category": "Electronics",
+    "price": 799.0,
+    "description": "Waterproof portable speaker with 12h battery life"
+  }
+  ```
+
+### 2. Autonomous AI Shopping Assistant
+* **`POST /api/ai/chat`**: Send conversational shopping queries to the Gemini AI Agent.
+  ```json
+  {
+    "message": "Do you have any products under 500 dollars?"
+  }
+  ```
+  **Response:**
+  > Here are the products currently available in the SmartCart store priced at or under 500:
+  > 1. **Coffee Mug** ($299, Home & Kitchen)
+  > 2. **Stainless Steel Water Bottle** ($499, Home & Kitchen)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License. Developed as an autonomous agentic e-commerce reference architecture.
