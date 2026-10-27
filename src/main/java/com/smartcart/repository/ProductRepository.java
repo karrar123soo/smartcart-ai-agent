@@ -18,4 +18,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 	List<Product> findByPriceLessThanEqual(double maxPrice);
 
+	boolean existsByNameIgnoreCase(String name);
+
 }
