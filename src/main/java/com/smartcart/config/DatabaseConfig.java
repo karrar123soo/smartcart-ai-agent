@@ -49,7 +49,13 @@ public class DatabaseConfig {
 	@Bean
 	@Primary
 	public DataSource dataSource() {
-		ConnectionInfo info = parseConnectionInfo(rawUrl, configuredUsername, configuredPassword);
+		String effectiveUrl = rawUrl;
+		String envUrl = cleanValue(getFirstNonBlankEnv("SPRING_DATASOURCE_URL", "DATABASE_URL", "DB_URL", "MYSQL_URL", "TIDB_URL"));
+		if (envUrl != null && !envUrl.isBlank()) {
+			effectiveUrl = envUrl;
+		}
+
+		ConnectionInfo info = parseConnectionInfo(effectiveUrl, configuredUsername, configuredPassword);
 
 		// Safe Diagnostics (Never prints passwords or secrets)
 		logSafeDiagnostics(info);
@@ -85,17 +91,20 @@ public class DatabaseConfig {
 
 		if (isCloud) {
 			if ("root".equalsIgnoreCase(info.username)) {
-				String alert = "DIAGNOSTIC ALERT: Username is 'root'! TiDB Cloud requires a cluster user like '<prefix>.root'.";
+				String alert = "CRITICAL CONFIGURATION ERROR: TiDB Cloud target detected, but Username is still default 'root'!\n" +
+						"TiDB Cloud requires your cluster username (e.g. '<prefix>.root'). Set SPRING_DATASOURCE_USERNAME in Render.";
 				System.err.println(alert);
 				log.error(alert);
 			}
-			if ("root".equals(info.password)) {
-				String alert = "DIAGNOSTIC ALERT: Password is still the local default 'root'! Cloud password was not provided.";
+			if ("root".equals(info.password) || info.password == null || info.password.isBlank()) {
+				String alert = "CRITICAL CONFIGURATION ERROR: TiDB Cloud target detected, but Password is the local default 'root' or empty!\n" +
+						"TiDB Cloud rejected the connection with MySQL Error 1045 because the password was not supplied or is still 'root'.\n" +
+						"Please set the SPRING_DATASOURCE_PASSWORD environment variable in the Render Dashboard to your cluster root password.";
 				System.err.println(alert);
 				log.error(alert);
 			}
 			if (info.password != null && info.password.contains("<PASSWORD>")) {
-				String alert = "DIAGNOSTIC ALERT: Password contains the literal placeholder '<PASSWORD>'.";
+				String alert = "CRITICAL CONFIGURATION ERROR: Password contains literal placeholder '<PASSWORD>'! Set real password in Render.";
 				System.err.println(alert);
 				log.error(alert);
 			}
@@ -119,8 +128,10 @@ public class DatabaseConfig {
 		String passSource = ("root".equals(password)) ? "DEFAULT_LOCAL" : "APPLICATION_PROPERTIES";
 
 		// 1. Check explicit environment variables (Highest priority)
-		String envUser = cleanValue(getFirstNonBlankEnv("SPRING_DATASOURCE_USERNAME", "DB_USERNAME", "DATABASE_USERNAME", "MYSQLUSER"));
-		String envPass = cleanValue(getFirstNonBlankEnv("SPRING_DATASOURCE_PASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD", "MYSQLPASSWORD"));
+		String envUser = cleanValue(getFirstNonBlankEnv(
+				"SPRING_DATASOURCE_USERNAME", "DB_USERNAME", "DATABASE_USERNAME", "MYSQL_USER", "MYSQLUSER", "TIDB_USER", "DB_USER"));
+		String envPass = cleanValue(getFirstNonBlankEnv(
+				"SPRING_DATASOURCE_PASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD", "MYSQL_PASSWORD", "MYSQLPASSWORD", "TIDB_PASSWORD", "DB_PASS", "DATABASE_PASS", "SPRING_DATASOURCE_PASS"));
 
 		if (envUser != null && !envUser.isBlank() && !"root".equals(envUser)) {
 			username = envUser;
@@ -131,7 +142,7 @@ public class DatabaseConfig {
 			passSource = "ENVIRONMENT_VARIABLE";
 		}
 
-		// 2. Check if credentials are embedded in URL (user:password@)
+		// 2. Check if credentials are embedded in URL authority (user:password@)
 		String withoutJdbc = trimmed.startsWith("jdbc:") ? trimmed.substring(5) : trimmed;
 
 		if (withoutJdbc.contains("@")) {
@@ -171,12 +182,68 @@ public class DatabaseConfig {
 			}
 		}
 
-		// 3. Ensure jdbc: prefix
+		// 3. Check if credentials are provided in URL query parameters (?user=...&password=...)
+		if (trimmed.contains("?")) {
+			try {
+				int qIdx = trimmed.indexOf("?");
+				String base = trimmed.substring(0, qIdx);
+				String query = trimmed.substring(qIdx + 1);
+				String[] params = query.split("&");
+				StringBuilder remainingParams = new StringBuilder();
+
+				for (String param : params) {
+					if (param.isBlank()) continue;
+					int eqIdx = param.indexOf("=");
+					String key = eqIdx != -1 ? param.substring(0, eqIdx).trim() : param.trim();
+					String value = eqIdx != -1 ? param.substring(eqIdx + 1).trim() : "";
+
+					if ("user".equalsIgnoreCase(key) || "username".equalsIgnoreCase(key)) {
+						String extractedUser = cleanValue(decodeIfPercentEncoded(value));
+						if (extractedUser != null && !extractedUser.isBlank()) {
+							if (username == null || "root".equals(username) || "DEFAULT_LOCAL".equals(userSource)) {
+								username = extractedUser;
+								userSource = "URL_QUERY_PARAM";
+							}
+						}
+						// Do not keep user credential in JDBC URL
+						continue;
+					}
+
+					if ("password".equalsIgnoreCase(key) || "pwd".equalsIgnoreCase(key)) {
+						String extractedPass = cleanValue(decodeIfPercentEncoded(value));
+						boolean isPlaceholder = extractedPass != null && (
+								extractedPass.equalsIgnoreCase("<PASSWORD>")
+								|| extractedPass.equalsIgnoreCase("<your_password>")
+								|| extractedPass.equalsIgnoreCase("<your-password>"));
+
+						if (!isPlaceholder && extractedPass != null && !extractedPass.isBlank()) {
+							if (password == null || "root".equals(password) || "DEFAULT_LOCAL".equals(passSource)) {
+								password = extractedPass;
+								passSource = "URL_QUERY_PARAM";
+							}
+						}
+						// Do not keep password credential in JDBC URL
+						continue;
+					}
+
+					if (remainingParams.length() > 0) {
+						remainingParams.append("&");
+					}
+					remainingParams.append(param);
+				}
+
+				trimmed = base + (remainingParams.length() > 0 ? "?" + remainingParams.toString() : "");
+			} catch (Exception e) {
+				log.warn("Could not parse query credentials from URL: {}", e.getMessage());
+			}
+		}
+
+		// 4. Ensure jdbc: prefix
 		if (!trimmed.startsWith("jdbc:")) {
 			trimmed = "jdbc:" + trimmed;
 		}
 
-		// 4. Ensure TiDB Cloud SSL parameters
+		// 5. Ensure TiDB Cloud SSL parameters
 		if (trimmed.contains("tidbcloud.com") && !trimmed.contains("sslMode") && !trimmed.contains("useSSL")) {
 			trimmed = trimmed + (trimmed.contains("?") ? "&" : "?") + "sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3";
 		}

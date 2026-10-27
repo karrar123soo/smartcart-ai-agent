@@ -99,4 +99,29 @@ class DatabaseConfigTest {
 		assertTrue(info.jdbcUrl.contains("sslMode=VERIFY_IDENTITY"));
 		assertTrue(info.jdbcUrl.startsWith("jdbc:mysql://"));
 	}
+
+	@Test
+	void parseConnectionInfo_shouldExtractCredentialsFromQueryParameters() {
+		String raw = "jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test?user=aTeXxfqU7Q8ZvKJ.root&password=secretQueryPass&useSSL=true";
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
+
+		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
+		assertEquals("secretQueryPass", info.password);
+		assertEquals("URL_QUERY_PARAM", info.usernameSource);
+		assertEquals("URL_QUERY_PARAM", info.passwordSource);
+		assertTrue(info.jdbcUrl.contains("useSSL=true"));
+		assertTrue(!info.jdbcUrl.contains("user="));
+		assertTrue(!info.jdbcUrl.contains("password="));
+	}
+
+	@Test
+	void parseConnectionInfo_shouldIgnorePlaceholderPasswordInQueryParameters() {
+		String raw = "jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test?user=aTeXxfqU7Q8ZvKJ.root&password=<PASSWORD>&useSSL=true";
+		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "myFallbackPass");
+
+		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
+		assertEquals("myFallbackPass", info.password);
+		assertEquals("APPLICATION_PROPERTIES", info.passwordSource);
+		assertTrue(!info.jdbcUrl.contains("<PASSWORD>"));
+	}
 }
