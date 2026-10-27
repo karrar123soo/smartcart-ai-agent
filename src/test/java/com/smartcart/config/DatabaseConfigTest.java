@@ -12,10 +12,10 @@ class DatabaseConfigTest {
 		String raw = "mysql://aTeXxfqU7Q8ZvKJ.root:secret123@gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test";
 		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
 
-		assertEquals(
-				"jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test?sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3",
-				info.jdbcUrl
-		);
+		assertTrue(info.jdbcUrl.startsWith("jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test?"));
+		assertTrue(info.jdbcUrl.contains("sslMode=VERIFY_IDENTITY"));
+		assertTrue(info.jdbcUrl.contains("defaultAuthenticationPlugin=com.mysql.cj.protocol.a.authentication.MysqlNativePasswordPlugin"));
+		assertTrue(info.jdbcUrl.contains("allowPublicKeyRetrieval=true"));
 		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
 		assertEquals("secret123", info.password);
 		assertEquals("EMBEDDED_IN_URL", info.usernameSource);
@@ -27,10 +27,10 @@ class DatabaseConfigTest {
 		String raw = "jdbc:mysql://aTeXxfqU7Q8ZvKJ.root:secret123@gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test";
 		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
 
-		assertEquals(
-				"jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test?sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3",
-				info.jdbcUrl
-		);
+		assertTrue(info.jdbcUrl.startsWith("jdbc:mysql://gateway01.ap-northeast-1.prod.aws.tidbcloud.com:4000/test?"));
+		assertTrue(info.jdbcUrl.contains("sslMode=VERIFY_IDENTITY"));
+		assertTrue(info.jdbcUrl.contains("defaultAuthenticationPlugin=com.mysql.cj.protocol.a.authentication.MysqlNativePasswordPlugin"));
+		assertTrue(info.jdbcUrl.contains("allowPublicKeyRetrieval=true"));
 		assertEquals("aTeXxfqU7Q8ZvKJ.root", info.username);
 		assertEquals("secret123", info.password);
 	}
@@ -71,10 +71,10 @@ class DatabaseConfigTest {
 
 	@Test
 	void parseConnectionInfo_shouldPreserveExistingQueryParameters() {
-		String raw = "mysql://user:pass@host:4000/test?sslMode=REQUIRED";
+		String raw = "mysql://user:pass@host:3306/test?sslMode=REQUIRED";
 		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
 
-		assertEquals("jdbc:mysql://host:4000/test?sslMode=REQUIRED", info.jdbcUrl);
+		assertEquals("jdbc:mysql://host:3306/test?sslMode=REQUIRED", info.jdbcUrl);
 		assertEquals("user", info.username);
 		assertEquals("pass", info.password);
 	}
@@ -97,6 +97,8 @@ class DatabaseConfigTest {
 		DatabaseConfig.ConnectionInfo info = DatabaseConfig.parseConnectionInfo(raw, "root", "root");
 
 		assertTrue(info.jdbcUrl.contains("sslMode=VERIFY_IDENTITY"));
+		assertTrue(info.jdbcUrl.contains("defaultAuthenticationPlugin=com.mysql.cj.protocol.a.authentication.MysqlNativePasswordPlugin"));
+		assertTrue(info.jdbcUrl.contains("allowPublicKeyRetrieval=true"));
 		assertTrue(info.jdbcUrl.startsWith("jdbc:mysql://"));
 	}
 

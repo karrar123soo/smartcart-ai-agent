@@ -73,7 +73,46 @@ public class DatabaseConfig {
 		dataSource.setIdleTimeout(600000);
 		dataSource.setMaxLifetime(1800000);
 
+		// Pre-flight connection validation
+		validateConnection(dataSource, info);
+
 		return dataSource;
+	}
+
+	private void validateConnection(HikariDataSource dataSource, ConnectionInfo info) {
+		try (var conn = dataSource.getConnection()) {
+			String successMsg = "\n============================================================\n" +
+					"SMARTCART DATABASE CONNECTION SUCCESSFUL!\n" +
+					"Target JDBC URL      : " + maskUrlForLogs(info.jdbcUrl) + "\n" +
+					"Target DB Username   : " + info.username + " (source: " + info.usernameSource + ")\n" +
+					"============================================================";
+			System.out.println(successMsg);
+			log.info(successMsg);
+		} catch (Exception e) {
+			String passAlert;
+			if ("root".equals(info.password)) {
+				passAlert = "Password is still the local default 'root'! Set SPRING_DATASOURCE_PASSWORD in Render.";
+			} else if (info.password == null || info.password.isBlank()) {
+				passAlert = "Password is EMPTY! Please set SPRING_DATASOURCE_PASSWORD in Render.";
+			} else {
+				passAlert = "Password was supplied (length: " + info.password.length() + " chars, source: " + info.passwordSource + "), but was rejected by TiDB Cloud.";
+			}
+
+			String report = "\n============================================================\n" +
+					"SMARTCART DATABASE CONNECTION FAILURE REPORT\n" +
+					"Target JDBC URL      : " + maskUrlForLogs(info.jdbcUrl) + "\n" +
+					"Target DB Username   : " + info.username + " (source: " + info.usernameSource + ")\n" +
+					"Password Source      : " + info.passwordSource + "\n" +
+					"Password Length      : " + (info.password != null ? info.password.length() : 0) + " chars\n" +
+					"Password is 'root'   : " + "root".equals(info.password) + "\n" +
+					"Diagnosis            : " + passAlert + "\n" +
+					"Underlying Exception : " + e.getMessage() + "\n" +
+					"============================================================";
+
+			System.err.println(report);
+			log.error(report);
+			throw new IllegalStateException("Database connection failed: " + passAlert + " (" + e.getMessage() + ")", e);
+		}
 	}
 
 	private void logSafeDiagnostics(ConnectionInfo info) {
@@ -243,9 +282,17 @@ public class DatabaseConfig {
 			trimmed = "jdbc:" + trimmed;
 		}
 
-		// 5. Ensure TiDB Cloud SSL parameters
-		if (trimmed.contains("tidbcloud.com") && !trimmed.contains("sslMode") && !trimmed.contains("useSSL")) {
-			trimmed = trimmed + (trimmed.contains("?") ? "&" : "?") + "sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3";
+		// 5. Ensure TiDB Cloud connection parameters (TLS, native authentication plugin, public key retrieval)
+		if (trimmed.contains("tidbcloud.com") || trimmed.contains(":4000")) {
+			if (!trimmed.contains("sslMode") && !trimmed.contains("useSSL")) {
+				trimmed = trimmed + (trimmed.contains("?") ? "&" : "?") + "sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2,TLSv1.3";
+			}
+			if (!trimmed.contains("defaultAuthenticationPlugin")) {
+				trimmed = trimmed + (trimmed.contains("?") ? "&" : "?") + "defaultAuthenticationPlugin=com.mysql.cj.protocol.a.authentication.MysqlNativePasswordPlugin";
+			}
+			if (!trimmed.contains("allowPublicKeyRetrieval")) {
+				trimmed = trimmed + (trimmed.contains("?") ? "&" : "?") + "allowPublicKeyRetrieval=true";
+			}
 		}
 
 		return new ConnectionInfo(trimmed, username, password, userSource, passSource);
