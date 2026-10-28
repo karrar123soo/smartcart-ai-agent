@@ -13,14 +13,31 @@ The AI assistant connects directly to a live **MySQL / TiDB Cloud** relational d
 
 ---
 
-## 🌐 Live Demo & Endpoints
+## 🌐 Live Demo & Deployment
 
-| Service | Platform | URL |
-| :--- | :--- | :--- |
-| **Frontend Web App** | **Vercel** | [https://frontend-six-bay-21.vercel.app](https://frontend-six-bay-21.vercel.app) |
-| **Catalog API** | **Render** | [https://smartcart-ai-agent.onrender.com/api/products](https://smartcart-ai-agent.onrender.com/api/products) |
-| **AI Chat Agent API** | **Render** | `POST https://smartcart-ai-agent.onrender.com/api/ai/chat` |
-| **GitHub Repository** | **GitHub** | [https://github.com/karrar123soo/smartcart-ai-agent](https://github.com/karrar123soo/smartcart-ai-agent) |
+| Resource | Platform | URL | Description |
+| :--- | :--- | :--- | :--- |
+| **Live Store (Web App)** | **Vercel** | [https://frontend-six-bay-21.vercel.app](https://frontend-six-bay-21.vercel.app) | Production Single Page Application |
+| **Catalog REST API** | **Render** | [https://smartcart-ai-agent.onrender.com/api/products](https://smartcart-ai-agent.onrender.com/api/products) | Live MySQL / TiDB Product Catalog |
+| **AI Shopping Chat API** | **Render** | `POST https://smartcart-ai-agent.onrender.com/api/ai/chat` | Google Gemini 3.5 Function-Calling Agent |
+| **GitHub Repository** | **GitHub** | [https://github.com/karrar123soo/smartcart-ai-agent](https://github.com/karrar123soo/smartcart-ai-agent) | Source code repository |
+
+> 💡 **Cloud Instance Note:**  
+> The backend is deployed on Render's free tier. If the instance has been idle, the first request may take ~30–50 seconds for cold-start initialization. Subsequent requests will execute in real time.
+
+### ⚡ Quick Live Testing (cURL)
+
+**1. Query Live Catalog:**
+```bash
+curl https://smartcart-ai-agent.onrender.com/api/products
+```
+
+**2. Query Live Gemini AI Shopping Agent:**
+```bash
+curl -X POST https://smartcart-ai-agent.onrender.com/api/ai/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What products do you have under 500?"}'
+```
 
 ---
 
