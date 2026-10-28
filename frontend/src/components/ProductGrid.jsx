@@ -16,13 +16,31 @@ export default function ProductGrid({
 
   // Extract unique categories dynamically
   const categories = useMemo(() => {
-    const cats = new Set(products.map((p) => p.category).filter(Boolean));
+    const cats = new Set(products.map((p) => (p.category || '').trim()).filter(Boolean));
     return ['All', ...Array.from(cats)];
   }, [products]);
 
-  // Filter and sort products
+  // Filter, deduplicate, and sort products
   const filteredProducts = useMemo(() => {
-    let result = [...products];
+    // Deduplicate products using stable product ID as primary key
+    const seenIds = new Set();
+    const seenContentKeys = new Set();
+    const unique = [];
+
+    for (const p of products) {
+      if (!p) continue;
+      if (p.id != null) {
+        const idKey = String(p.id);
+        if (seenIds.has(idKey)) continue;
+        seenIds.add(idKey);
+      }
+      const itemKey = `${(p.name || '').trim().toLowerCase()}|${(p.category || '').trim().toLowerCase()}|${p.price}`;
+      if (seenContentKeys.has(itemKey)) continue;
+      seenContentKeys.add(itemKey);
+      unique.push(p);
+    }
+
+    let result = unique;
 
     // Category filter
     if (selectedCategory !== 'All') {
@@ -58,7 +76,10 @@ export default function ProductGrid({
     <section className="catalog-section" id="catalog">
       <div className="catalog-header">
         <div className="catalog-title-group">
-          <h2 className="catalog-title">Live Store Catalog</h2>
+          <div>
+            <h2 className="catalog-title">Featured Products</h2>
+            <p className="catalog-subtitle">Live verified inventory powered by MySQL and Gemini AI</p>
+          </div>
           <span className="catalog-badge">
             {loading ? 'Refreshing...' : `${filteredProducts.length} items`}
           </span>
@@ -144,7 +165,7 @@ export default function ProductGrid({
         <div className="product-grid-layout">
           {filteredProducts.map((product) => (
             <ProductCard
-              key={product.id}
+              key={product.id != null ? `product-${product.id}` : `product-${product.name}-${product.category}`}
               product={product}
               onAddToCart={onAddToCart}
               onAskAI={onAskAI}

@@ -9,6 +9,38 @@ import { getProducts } from './api';
 import { Sparkles, Bot, Heart, Layers, Cpu, Database } from 'lucide-react';
 import './App.css';
 
+// Stable deduplication helper by product ID
+function deduplicateProducts(items) {
+  if (!Array.isArray(items)) return [];
+  const seenIds = new Set();
+  const seenContentKeys = new Set();
+  const uniqueList = [];
+
+  for (const item of items) {
+    if (!item) continue;
+
+    // 1. Deduplicate by stable product ID
+    if (item.id != null) {
+      const idStr = String(item.id);
+      if (seenIds.has(idStr)) {
+        continue;
+      }
+      seenIds.add(idStr);
+    }
+
+    // 2. Deduplicate identical records (same name, category, and price)
+    const contentKey = `${(item.name || '').trim().toLowerCase()}|${(item.category || '').trim().toLowerCase()}|${item.price}`;
+    if (seenContentKeys.has(contentKey)) {
+      continue;
+    }
+    seenContentKeys.add(contentKey);
+
+    uniqueList.push(item);
+  }
+
+  return uniqueList;
+}
+
 export default function App() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,13 +73,13 @@ export default function App() {
     }
   }, [cartItems]);
 
-  // Load products from backend
+  // Load products from backend with stable deduplication
   const loadProducts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getProducts();
-      setProducts(Array.isArray(data) ? data : []);
+      setProducts(deduplicateProducts(data));
     } catch (err) {
       console.error('Failed to load products:', err);
       setError(err.message || 'Error connecting to Spring Boot backend.');
@@ -102,9 +134,10 @@ export default function App() {
     setIsChatOpen(true);
   };
 
-  // Callback when product is added from modal
+  // Callback when product is added from modal (deduplicated)
   const handleProductAdded = (newProduct) => {
-    setProducts((prev) => [newProduct, ...prev]);
+    if (!newProduct) return;
+    setProducts((prev) => deduplicateProducts([newProduct, ...prev]));
   };
 
   const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);

@@ -1,50 +1,10 @@
 import React, { useState } from 'react';
 import { ShoppingCart, Check, Sparkles, Tag } from 'lucide-react';
-
-// Curated aesthetic fallback visuals based on category/name
-function getProductVisual(category, name) {
-  const lowerName = (name || '').toLowerCase();
-  const lowerCat = (category || '').toLowerCase();
-
-  if (lowerName.includes('earbud') || lowerName.includes('headphone')) {
-    return {
-      gradient: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
-      emoji: '🎧',
-      accent: '#818cf8',
-    };
-  }
-  if (lowerName.includes('keyboard')) {
-    return {
-      gradient: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-      emoji: '⌨️',
-      accent: '#38bdf8',
-    };
-  }
-  if (lowerName.includes('mug') || lowerCat.includes('kitchen') || lowerCat.includes('home')) {
-    return {
-      gradient: 'linear-gradient(135deg, #311b1b 0%, #451a03 100%)',
-      emoji: '☕',
-      accent: '#fb923c',
-    };
-  }
-  if (lowerName.includes('shoe') || lowerCat.includes('footwear')) {
-    return {
-      gradient: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)',
-      emoji: '👟',
-      accent: '#34d399',
-    };
-  }
-
-  return {
-    gradient: 'linear-gradient(135deg, #2e1065 0%, #1e1b4b 100%)',
-    emoji: '✨',
-    accent: '#a78bfa',
-  };
-}
+import { getProductImage, handleImageError } from '../utils/productImages';
 
 export default function ProductCard({ product, onAddToCart, onAskAI }) {
   const [isAdded, setIsAdded] = useState(false);
-  const visual = getProductVisual(product.category, product.name);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const handleAdd = () => {
     onAddToCart(product);
@@ -57,11 +17,21 @@ export default function ProductCard({ product, onAddToCart, onAskAI }) {
     currency: 'USD',
   }).format(product.price);
 
+  const imageUrl = getProductImage(product);
+
   return (
     <article className="product-card">
-      {/* Product Image / Visual Canvas */}
-      <div className="product-card-visual" style={{ background: visual.gradient }}>
-        <span className="product-visual-emoji">{visual.emoji}</span>
+      {/* Product Image Canvas */}
+      <div className={`product-card-visual ${imgLoaded ? 'loaded' : 'loading'}`}>
+        <img
+          src={imageUrl}
+          alt={product.name}
+          className="product-card-img"
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setImgLoaded(true)}
+          onError={handleImageError}
+        />
         <div className="product-category-tag">
           <Tag size={12} />
           <span>{product.category || 'General'}</span>
@@ -103,6 +73,7 @@ export default function ProductCard({ product, onAddToCart, onAskAI }) {
             className="btn-card-ai"
             onClick={() => onAskAI(`Tell me about the ${product.name} priced at ${formattedPrice} from your store.`)}
             title="Ask AI Shopping Assistant about this product"
+            aria-label={`Ask AI Shopping Assistant about ${product.name}`}
           >
             <Sparkles size={14} />
             <span>Ask AI</span>

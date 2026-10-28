@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Trash2, Plus, Minus, ShoppingBag, CheckCircle, ArrowRight } from 'lucide-react';
+import { getProductImage, handleImageError } from '../utils/productImages';
 
 export default function CartDrawer({
   isOpen,
@@ -64,6 +65,14 @@ export default function CartDrawer({
               ) : (
                 cartItems.map((item) => (
                   <div key={item.id} className="cart-item-card">
+                    <div className="cart-item-thumb">
+                      <img
+                        src={getProductImage(item)}
+                        alt={item.name}
+                        loading="lazy"
+                        onError={handleImageError}
+                      />
+                    </div>
                     <div className="cart-item-info">
                       <h4>{item.name}</h4>
                       <span className="cart-item-cat">{item.category}</span>
