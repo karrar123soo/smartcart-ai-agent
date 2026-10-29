@@ -206,8 +206,9 @@ const CATEGORY_IMAGE_MAP = {
  * @returns {string} Real product photograph URL
  */
 export function getProductImage(product = {}) {
-  if (product.imageUrl && typeof product.imageUrl === 'string' && product.imageUrl.startsWith('http')) {
-    return product.imageUrl;
+  const directUrl = product.imageUrl || product.image || product.photo || product.img;
+  if (directUrl && typeof directUrl === 'string' && directUrl.startsWith('http')) {
+    return directUrl;
   }
 
   const name = (product.name || '').toLowerCase();

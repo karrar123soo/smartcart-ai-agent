@@ -30,7 +30,10 @@ export default function ProductCard({ product, onAddToCart, onAskAI }) {
           loading="lazy"
           decoding="async"
           onLoad={() => setImgLoaded(true)}
-          onError={handleImageError}
+          onError={(e) => {
+            setImgLoaded(true);
+            handleImageError(e);
+          }}
         />
         <div className="product-category-tag">
           <Tag size={12} />

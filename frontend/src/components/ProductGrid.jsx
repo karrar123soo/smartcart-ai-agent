@@ -165,7 +165,7 @@ export default function ProductGrid({
         <div className="product-grid-layout">
           {filteredProducts.map((product) => (
             <ProductCard
-              key={product.id != null ? `product-${product.id}` : `product-${product.name}-${product.category}`}
+              key={product.id}
               product={product}
               onAddToCart={onAddToCart}
               onAskAI={onAskAI}
